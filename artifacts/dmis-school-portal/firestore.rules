@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function hasStaffProfile() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/staffProfiles/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return hasStaffProfile()
+        && get(/databases/$(database)/documents/staffProfiles/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isTeacher() {
+      return hasStaffProfile()
+        && get(/databases/$(database)/documents/staffProfiles/$(request.auth.uid)).data.role == 'teacher';
+    }
+
+    function isStaff() {
+      return isAdmin() || isTeacher();
+    }
+
+    function canAccessClass(classId) {
+      return isAdmin()
+        || (isTeacher()
+          && classId in get(/databases/$(database)/documents/staffProfiles/$(request.auth.uid)).data.assignedClassIds);
+    }
+
+    match /staffProfiles/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /admissionApplications/{applicationId} {
+      allow create: if request.resource.data.keys().hasOnly([
+          'childName', 'guardianName', 'phone', 'email', 'classApplying',
+          'startTerm', 'notes', 'status', 'createdAt'
+        ])
+        && request.resource.data.childName is string
+        && request.resource.data.childName.size() > 0
+        && request.resource.data.childName.size() <= 120
+        && request.resource.data.guardianName is string
+        && request.resource.data.guardianName.size() > 0
+        && request.resource.data.guardianName.size() <= 120
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() <= 24
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 160
+        && request.resource.data.classApplying is string
+        && request.resource.data.classApplying.size() <= 40
+        && request.resource.data.startTerm is string
+        && request.resource.data.startTerm.size() <= 80
+        && request.resource.data.notes is string
+        && request.resource.data.notes.size() <= 1000
+        && request.resource.data.status == 'new'
+        && request.resource.data.createdAt == request.time;
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /students/{studentId} {
+      allow read: if isAdmin() || (isTeacher() && resource.data.classId in
+        get(/databases/$(database)/documents/staffProfiles/$(request.auth.uid)).data.assignedClassIds);
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /teachers/{teacherId} {
+      allow read: if isStaff();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /classes/{classId} {
+      allow read: if isStaff();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /subjects/{subjectId} {
+      allow read: if isStaff();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /results/{resultId} {
+      allow read: if canAccessClass(resource.data.classId);
+      allow create: if canAccessClass(request.resource.data.classId);
+      allow update: if canAccessClass(resource.data.classId)
+        && request.resource.data.classId == resource.data.classId;
+      allow delete: if isAdmin();
+    }
+
+    match /fees/{feeId} {
+      allow read, create, update, delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

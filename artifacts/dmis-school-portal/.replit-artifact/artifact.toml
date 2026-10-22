@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Darul Muttaqeen International School"
+description = "A responsive school management portal for Darul Muttaqeen International School in Gusau, Zamfara State, with public school information, admissions, student and teacher records, academics, report cards, fees, and staff sign-in."
+version = "1.0.0"
+id = "artifacts/dmis-school-portal"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19007
+
+[services.development]
+run = "pnpm --filter @workspace/dmis-school-portal run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/dmis-school-portal", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/dmis-school-portal/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19007"
+BASE_PATH = "/"
