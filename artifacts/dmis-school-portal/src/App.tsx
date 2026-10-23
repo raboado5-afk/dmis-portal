@@ -170,6 +170,46 @@ function ContactPage() {
     </div></section></main></PublicShell>;
 }
 
+function firebaseSignInNotice(error: unknown): string {
+  const code =
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+      ? error.code
+      : '';
+
+  if (
+    code === 'auth/invalid-credential' ||
+    code === 'auth/wrong-password' ||
+    code === 'auth/user-not-found' ||
+    code === 'auth/invalid-email'
+  ) {
+    return 'Email or password was not accepted. Check the staff account in Firebase Authentication and try again.';
+  }
+  if (code === 'auth/operation-not-allowed') {
+    return 'Email/Password sign-in is disabled for this Firebase project. Enable it in Authentication → Sign-in method.';
+  }
+  if (code === 'auth/unauthorized-domain') {
+    return 'This website domain is not authorized in Firebase Authentication. Add it under Authentication → Settings → Authorized domains.';
+  }
+  if (code === 'auth/user-disabled') {
+    return 'This Firebase Authentication account is disabled. Ask the administrator to check its status.';
+  }
+  if (code === 'auth/too-many-requests') {
+    return 'Firebase has temporarily limited sign-in attempts. Wait a little while, then try again.';
+  }
+  if (code === 'auth/network-request-failed') {
+    return 'Could not reach Firebase Authentication. Check the connection and try again.';
+  }
+  if (code.includes('api-key')) {
+    return 'Firebase rejected the app configuration. Verify the Web app API key and project settings.';
+  }
+  return code
+    ? `Firebase sign-in failed (${code}).`
+    : 'Sign-in could not be completed. Check the Firebase setup and try again.';
+}
+
 function LoginPage() {
   const { configured, status, profile, signIn } = useAuth();
   const [notice, setNotice] = useState('');
@@ -182,8 +222,8 @@ function LoginPage() {
     setBusy(true);
     try {
       await signIn(String(form.get('email')||'').trim(),String(form.get('password')||''));
-    } catch {
-      setNotice('Sign-in failed. Check your email and password, then try again.');
+    } catch (error) {
+      setNotice(firebaseSignInNotice(error));
     } finally {
       setBusy(false);
     }
