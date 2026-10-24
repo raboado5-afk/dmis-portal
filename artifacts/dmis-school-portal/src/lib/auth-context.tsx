@@ -33,10 +33,16 @@ type AuthStatus =
   | 'authorized'
   | 'unauthorized';
 
+export type StaffProfileIssue =
+  | 'missing-profile'
+  | 'invalid-role'
+  | `firestore-read:${string}`;
+
 type AuthContextValue = {
   configured: boolean;
   status: AuthStatus;
   profile: StaffProfile | null;
+  profileIssue: StaffProfileIssue | null;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -65,11 +71,25 @@ function profileFromData(
   };
 }
 
+function firestoreErrorCode(error: unknown): string {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string' &&
+    /^[a-z0-9-]+(?:\/[a-z0-9-]+)?$/i.test(error.code)
+  ) {
+    return error.code;
+  }
+  return 'unknown';
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>(
     firebaseConfigured ? 'loading' : 'demo',
   );
   const [profile, setProfile] = useState<StaffProfile | null>(null);
+  const [profileIssue, setProfileIssue] = useState<StaffProfileIssue | null>(null);
   const deniedUser = useRef(false);
 
   useEffect(() => {
@@ -84,23 +104,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user) {
         setProfile(null);
         setStatus(deniedUser.current ? 'unauthorized' : 'signed-out');
+        if (!deniedUser.current) setProfileIssue(null);
         deniedUser.current = false;
         return;
       }
 
       setStatus('loading');
+      setProfileIssue(null);
       try {
         const profileDoc = await getDoc(doc(currentDb, 'staffProfiles', user.uid));
-        const staffProfile = profileDoc.exists()
-          ? profileFromData(
-              user.uid,
-              user,
-              profileDoc.data() as Record<string, unknown>,
-            )
-          : null;
+        if (!profileDoc.exists()) {
+          deniedUser.current = true;
+          setProfileIssue('missing-profile');
+          setProfile(null);
+          await firebaseSignOut(currentAuth);
+          return;
+        }
 
+        const staffProfile = profileFromData(
+          user.uid,
+          user,
+          profileDoc.data() as Record<string, unknown>,
+        );
         if (!staffProfile) {
           deniedUser.current = true;
+          setProfileIssue('invalid-role');
           setProfile(null);
           await firebaseSignOut(currentAuth);
           return;
@@ -108,8 +136,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setProfile(staffProfile);
         setStatus('authorized');
-      } catch {
+      } catch (error) {
         deniedUser.current = true;
+        setProfileIssue(`firestore-read:${firestoreErrorCode(error)}`);
         setProfile(null);
         await firebaseSignOut(currentAuth);
       }
@@ -121,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       configured: firebaseConfigured,
       status,
       profile,
+      profileIssue,
       signIn: async (email, password) => {
         if (!auth) throw new Error('Firebase Authentication is not configured.');
         await signInWithEmailAndPassword(auth, email, password);
@@ -129,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (auth) await firebaseSignOut(auth);
       },
     }),
-    [profile, status],
+    [profile, profileIssue, status],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

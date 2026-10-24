@@ -210,8 +210,25 @@ function firebaseSignInNotice(error: unknown): string {
     : 'Sign-in could not be completed. Check the Firebase setup and try again.';
 }
 
+function staffProfileIssueMessage(issue: string | null): string {
+  if (issue === 'missing-profile') {
+    return 'No profile was found at staffProfiles/{Auth UID}. Set the Firestore document ID to the exact Firebase Authentication UID.';
+  }
+  if (issue === 'invalid-role') {
+    return 'A profile was found, but its role must be exactly admin or teacher.';
+  }
+  if (issue?.startsWith('firestore-read:')) {
+    const code = issue.slice('firestore-read:'.length);
+    if (code === 'permission-denied') {
+      return 'Firestore denied the profile read. Check that the published rules in this Firebase project allow a signed-in user to get their own staffProfiles document.';
+    }
+    return `Firestore could not read the staff profile (${code}). Check the Firebase project and connection.`;
+  }
+  return 'The account does not have a readable, approved DMIS staff profile.';
+}
+
 function LoginPage() {
-  const { configured, status, profile, signIn } = useAuth();
+  const { configured, status, profile, profileIssue, signIn } = useAuth();
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   if (status === 'authorized') return <Redirect to="/portal/students" />;
@@ -230,7 +247,7 @@ function LoginPage() {
   }
   return <PublicShell><main className="login-shell"><div className="login-card">
     <Brand/><h1>Staff sign in</h1><p>For authorized school administrators and teachers.</p>
-    {!configured ? <div className="login-alert"><strong>Firebase setup pending.</strong> Sign-in is unavailable until the Firebase project is connected. No credentials will be checked.</div> : status==='unauthorized' ? <div className="login-alert" role="alert"><strong>Staff access required.</strong> This account does not have an approved DMIS staff profile. Ask the administrator to authorize it.</div> : <div className="login-alert"><strong>Authorized staff only.</strong> Sign-in uses Firebase Authentication; access is granted only to approved staff profiles.</div>}
+    {!configured ? <div className="login-alert"><strong>Firebase setup pending.</strong> Sign-in is unavailable until the Firebase project is connected. No credentials will be checked.</div> : status==='unauthorized' ? <div className="login-alert" role="alert"><strong>Staff access required.</strong> {staffProfileIssueMessage(profileIssue)}</div> : <div className="login-alert"><strong>Authorized staff only.</strong> Sign-in uses Firebase Authentication; access is granted only to approved staff profiles.</div>}
     <form onSubmit={handleSignIn}><div className="field" style={{marginBottom:15}}><label htmlFor="staff-email">Email address</label><input id="staff-email" name="email" type="email" autoComplete="username" placeholder="name@school.example" required disabled={!configured||busy} data-testid="input-staff-email"/></div><div className="field"><label htmlFor="staff-password">Password</label><input id="staff-password" name="password" type="password" autoComplete="current-password" placeholder="Password" required disabled={!configured||busy} data-testid="input-staff-password"/></div><button className="btn btn-primary" type="submit" disabled={!configured||busy} style={{width:'100%',marginTop:20,opacity:(!configured||busy)?0.65:1}} data-testid="button-sign-in">{busy?'Signing in…':'Sign in'} <ArrowRight size={15}/></button></form>
     {notice && <p role="status" className="login-alert">{notice}</p>}
     {profile&&<div className="hint" style={{marginTop:18,textAlign:'center'}}>Signed in as {profile.displayName}.</div>}
