@@ -256,7 +256,20 @@ function LoginPage() {
 }
 
 type Student = { id:string; name:string; code:string; className:string; classId:string; guardian:string; status:string };
-type Teacher = { id:string; name:string; initials:string; subject:string; classes:string[]; status:string };
+type Teacher = {
+  id:string;
+  name?:string;
+  fullName?:string;
+  initials?:string;
+  subject?:string;
+  subjects?:string[]|string;
+  classes?:string[]|string;
+  'class assigned'?:string;
+  email?:string;
+  status?:string;
+  role?:string;
+};
+type TeacherDirectoryRow = {id:string;name:string;initials:string;subject:string;classes:string[];email?:string;status:string};
 type ResultRecord = { id:string; student:string; className:string; classId?:string; scores:number[]; subjects?:string[] };
 const initialStudents: Student[] = [
   {id:'s1',name:'Amina Yusuf',code:'DEMO-001',className:'Primary 4',classId:'primary-4',guardian:'Hauwa Yusuf',status:'Active'},
@@ -302,6 +315,11 @@ function DemoHeader({title,description,action,isDemo=!firebaseConfigured}:{title
 }
 function Metric({label,value,foot}:{label:string;value:string;foot:string}) { return <div className="metric-card"><div className="metric-label">{label}</div><div className="metric-value">{value}</div><div className="metric-foot">{foot}</div></div>; }
 function initials(name:string) { return name.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase(); }
+function stringList(value:unknown):string[] {
+  if (Array.isArray(value)) return value.filter((item):item is string=>typeof item==='string'&&item.trim().length>0).map(item=>item.trim());
+  if (typeof value==='string'&&value.trim()) return [value.trim()];
+  return [];
+}
 function DataNotice({loading,error}:{loading:boolean;error:string}) {
   if (loading) return <div className="demo-callout" role="status">Loading school records…</div>;
   if (error) return <div className="demo-callout" role="alert">Could not load school records: {error}</div>;
@@ -326,13 +344,28 @@ function StudentsPage() {
 }
 
 function TeachersPage() {
-  const {records:teacherRecords,loading,error,isDemo}=useSchoolCollection<Teacher>('teachers',teachers);
+  const {records,loading,error,isDemo}=useSchoolCollection<Teacher>('teachers',teachers);
+  const teacherRecords:TeacherDirectoryRow[]=records.map((teacher)=>{
+    const name=[teacher.name,teacher.fullName,teacher.email].find(value=>typeof value==='string'&&value.trim())||'Unnamed teacher';
+    const classes=stringList(teacher.classes);
+    const assignedClasses=classes.length?classes:stringList(teacher['class assigned']);
+    const subject=(typeof teacher.subject==='string'&&teacher.subject.trim()?teacher.subject.trim():stringList(teacher.subjects).join(', '))||'—';
+    return {
+      id:teacher.id,
+      name,
+      initials:teacher.initials||initials(name),
+      subject,
+      classes:assignedClasses,
+      email:teacher.email,
+      status:teacher.status||teacher.role||'—',
+    };
+  });
   const [search,setSearch]=useState('');
-  const rows=teacherRecords.filter(t=>`${t.name} ${t.subject} ${(t.classes || []).join(' ')}`.toLowerCase().includes(search.toLowerCase()));
+  const rows=teacherRecords.filter(t=>`${t.name} ${t.email||''} ${t.subject} ${(t.classes || []).join(' ')}`.toLowerCase().includes(search.toLowerCase()));
   return <PortalShell title="Teachers"><DemoHeader title="Teacher profiles" description={isDemo?"Fictitious profiles with illustrative subject and class assignments.":"School staff profiles and assigned classes."} isDemo={isDemo}/>
     <DataNotice loading={loading} error={error}/>
-    <div className="metric-grid"><Metric label={isDemo?"Sample profiles":"Staff profiles"} value={String(teacherRecords.length)} foot={isDemo?"Not DMIS staff records":"Authorized school directory"}/><Metric label="Subjects shown" value={String(new Set(teacherRecords.map(t=>t.subject)).size)} foot={isDemo?"Illustrative assignments":"From school records"}/><Metric label="Class groups" value={String(new Set(teacherRecords.flatMap(t=>t.classes || [])).size)} foot={isDemo?"Demo only":"From school records"}/><Metric label="Profile state" value={isDemo?"Preview":"Connected"} foot={isDemo?"No staff directory connected":"Firebase records"}/></div>
-    <section className="table-card"><div className="table-head"><h2>Teacher directory</h2><div style={{position:'relative',width:220}}><Search size={14} style={{position:'absolute',left:10,top:11,color:'#899486'}}/><input className="searchbox" style={{paddingLeft:30}} aria-label="Search teachers" placeholder="Search profiles" value={search} onChange={e=>setSearch(e.target.value)}/></div></div><div className="table-wrap"><table><thead><tr><th>Teacher</th><th>Subject</th><th>Assigned classes</th><th>Profile status</th></tr></thead><tbody>{rows.map(t=><tr key={t.id}><td><div className="person-cell"><span className="avatar">{t.initials}</span><span className="person-name">{t.name}</span></div></td><td>{t.subject}</td><td>{(t.classes || []).map(c=><span className="pill" key={c} style={{marginRight:5}}>{c}</span>)}</td><td><span className="pill gold">{t.status}</span></td></tr>)}</tbody></table>{rows.length===0&&<div className="empty-state">No sample profiles match that search.</div>}</div></section>
+    <div className="metric-grid"><Metric label={isDemo?"Sample profiles":"Staff profiles"} value={String(teacherRecords.length)} foot={isDemo?"Not DMIS staff records":"Authorized school directory"}/><Metric label="Subjects shown" value={String(new Set(teacherRecords.map(t=>t.subject).filter(subject=>subject!=='—')).size)} foot={isDemo?"Illustrative assignments":"From school records"}/><Metric label="Class groups" value={String(new Set(teacherRecords.flatMap(t=>t.classes || [])).size)} foot={isDemo?"Demo only":"From school records"}/><Metric label="Profile state" value={isDemo?"Preview":"Connected"} foot={isDemo?"No staff directory connected":"Firebase records"}/></div>
+    <section className="table-card"><div className="table-head"><h2>Teacher directory</h2><div style={{position:'relative',width:220}}><Search size={14} style={{position:'absolute',left:10,top:11,color:'#899486'}}/><input className="searchbox" style={{paddingLeft:30}} aria-label="Search teachers" placeholder="Search profiles" value={search} onChange={e=>setSearch(e.target.value)}/></div></div><div className="table-wrap"><table><thead><tr><th>Teacher</th><th>Subject</th><th>Assigned classes</th><th>Profile status</th></tr></thead><tbody>{rows.map(t=><tr key={t.id}><td><div className="person-cell"><span className="avatar">{t.initials}</span><span><span className="person-name">{t.name}</span>{t.email&&<span className="mini-note" style={{display:'block'}}>{t.email}</span>}</span></div></td><td>{t.subject}</td><td>{(t.classes || []).map(c=><span className="pill" key={c} style={{marginRight:5}}>{c}</span>)}</td><td><span className="pill gold">{t.status}</span></td></tr>)}</tbody></table>{rows.length===0&&<div className="empty-state">No teacher records match that search.</div>}</div></section>
   </PortalShell>;
 }
 
