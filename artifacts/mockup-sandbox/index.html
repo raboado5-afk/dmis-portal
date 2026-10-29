@@ -29,3 +29,49 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
+  <script type="module" src="/src/main.tsx"></script>
+
+  <!-- DMIS RESULT CHECKER -->
+  <div id="dmisResultBtn" style="position:fixed;bottom:20px;right:20px;z-index:99999;background:#0f3d2e;color:white;padding:14px 22px;border-radius:30px;font-weight:bold;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-family:sans-serif;" onclick="openDMIS()">🎓 Check Result</div>
+  
+  <div id="dmisModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:100000;justify-content:center;align-items:center;">
+    <div style="background:white;padding:25px;border-radius:15px;width:90%;max-width:400px;font-family:sans-serif;">
+      <h3 style="margin:0 0 15px;color:#0f3d2e;">Check Result - DMIS</h3>
+      <input id="admNo" placeholder="Shigar da DMIS/001" style="width:100%;padding:12px;border:2px solid #0f3d2e;border-radius:8px;margin-bottom:12px;box-sizing:border-box;" />
+      <button onclick="checkResult()" style="width:100%;padding:12px;background:#0f3d2e;color:white;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">Duba Result</button>
+      <div id="resultBox" style="margin-top:15px;display:none;background:#f5f5f5;padding:12px;border-radius:8px;font-size:14px;overflow:auto;max-height:300px;"></div>
+      <button onclick="closeDMIS()" style="margin-top:10px;width:100%;padding:10px;background:#ddd;border:none;border-radius:8px;cursor:pointer;">Rufe</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    const firebaseConfig = {
+      apiKey: "AIzaSyA1TjWzkkQL5fh_UnYUg0l_mPB58nRAFSc",
+      authDomain: "darul-muttaqeen-international.firebaseapp.com",
+      projectId: "darul-muttaqeen-international",
+      storageBucket: "darul-muttaqeen-international.firebasestorage.app",
+      messagingSenderId: "434364578185",
+      appId: "1:434364578185:web:64079d4c44e46f611b8958"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    window.openDMIS = ()=>{ document.getElementById('dmisModal').style.display='flex'; }
+    window.closeDMIS = ()=>{ document.getElementById('dmisModal').style.display='none'; }
+    window.checkResult = async function(){
+      const admNo = document.getElementById('admNo').value.trim();
+      const box = document.getElementById('resultBox');
+      if(!admNo){ alert("Shigar da Admission No!"); return; }
+      box.style.display="block"; box.innerHTML="Ana nema...";
+      try{
+        const q = query(collection(db, "results"), where("admNo", "==", admNo));
+        const snap = await getDocs(q);
+        if(snap.empty){ box.innerHTML="❌ Ba a samu result na "+admNo+" ba"; return; }
+        let html="<b>Result na "+admNo+"</b><br><br><table border=1 cellpadding=6 style='width:100%;border-collapse:collapse;'><tr style='background:#0f3d2e;color:white;'><th>Subject</th><th>Total</th><th>Grade</th></tr>";
+        snap.forEach(d=>{ const r=d.data(); html+=`<tr><td>${r.subjects||r.subject||''}</td><td>${r.total}</td><td>${r.grade}</td></tr>`; });
+        html+="</table>"; box.innerHTML=html;
+      }catch(e){ box.innerHTML="Error: "+e.message; }
+    }
+  </script>
+</body>
