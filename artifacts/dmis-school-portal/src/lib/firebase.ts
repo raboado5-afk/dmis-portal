@@ -3,30 +3,17 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const config = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  apiKey: "AIzaSyB9C0wsMvzecHYxoIRV4P0BGJpKRcfgzSA",
+  authDomain: "dmis-school-ab4d8.firebaseapp.com",
+  projectId: "dmis-school-ab4d8",
+  storageBucket: "dmis-school-ab4d8.firebasestorage.app",
+  messagingSenderId: "169015818337",
+  appId: "1:169015818337:web:246d06c36fdd230d3a1220",
+  measurementId: "G-HVFQTNK48M"
 };
 
-const requiredConfig = [
-  config.apiKey,
-  config.authDomain,
-  config.projectId,
-  config.appId,
-];
-
-export const firebaseConfigured = requiredConfig.every(
-  (value) => typeof value === 'string' && value.trim().length > 0,
-);
-
-const app = firebaseConfigured
-  ? getApps().length > 0
-    ? getApp()
-    : initializeApp(config)
-  : null;
-
-export const auth = app ? getAuth(app) : null;
-export const db = app ? getFirestore(app) : null;
+const app = getApps().length ? getApp() : initializeApp(config);
+export const firebase = app;
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export default app;
