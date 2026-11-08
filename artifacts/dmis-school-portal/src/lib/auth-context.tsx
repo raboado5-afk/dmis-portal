@@ -14,8 +14,8 @@ import {
   type User,
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { auth, db, firebaseConfigured } from './firebase';
-
+import { auth, db } from './firebase';
+const firebaseConfigured = Boolean(auth && db);
 export type StaffRole = 'admin' | 'teacher';
 
 export type StaffProfile = {
